@@ -1,0 +1,145 @@
+import random
+import time
+import socket
+ip  = "192.168.4.1"                     # static ip of the pi
+addressSave = []                        # array for the ip's of connected devices
+
+def communication():
+     s = socket.socket(socket.AF_INET,socket.SOCK_STREAM) # set up socket
+     s.bind((ip,1234))                                    # bind socket to the set ip and port 1234
+     s.listen(2)                                          # if 2 devices try to connect at the same time set up a que of two
+     for x in range(100):                                 # for loop reset after every 100 connections
+         clientsocket, address = s.accept()               # wait for client to connect and save their ip to address
+         addressSave.insert(x, address[0])                # in addressSave insert the value of address(ip of connected device) at position x(itteration of the for loop)
+         print(f"connection from {addressSave[x]} has been established")
+         if(addressSave[x]==addressSave[0]):              # if the ip of the connected device matches the one of the previously connected device
+             x = 2                                        # set x to 2
+             flag = 0                                     # keep flag at 0
+         else:                                            # if it dose not match
+             x = 1                                        # set x to 1
+             flag = 1                                     # set flag to 1
+         inputs = clientsocket.recv(16)                   # save data from client in 16 byte chunks
+         decodedInputs = inputs.decode("utf-8")           # decode data from client
+         s1,s2,s3 = decodedInputs.split()                 # split the data into three
+         s1=int(s1)                                       # convert data from string to integer
+         s2=int(s2)
+         s3=int(s3)
+         trilateration(s1,s2,s3,flag)                    # call trilateration function and pass trough data and flag
+
+def trilateration(r1,r2,r3,flag):       # algorithm for finding the position of phone
+     x1 = 1000                          # setting the locations of the three pi's
+     y1 = 500
+     x2 = 0
+     y2 = 500
+     x3 = 1000
+     y3 = 0
+     #calculations
+     A = 2*x2 - 2*x1
+     B = 2*y2 - 2*y1
+     C = r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2
+     D = 2*x3 - 2*x2
+     E = 2*y3 - 2*y2
+     F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
+     x = ((C*E - F*B)/(E*A - B*D))
+     y = ((C*D - A*F)/(B*D - A*E))
+     if x < 0 or y < 0 or x > 1000 or y > 500: # if the result is outside of the parameters return error
+         print("out of bounds")
+         return
+     else:                                     # else continue to next function
+         htmlFunction(x,y,flag)
+
+def htmlFunction(x,y,flag):
+     global x22,y22                            # set x22 and y22 as global variables
+     if(flag==0):                              # if flag is set to 0 create an HTML file that refreshes every 1 second that has a canvas with one red dot and the coordinates from the trilateration calculation
+         text="""
+         <!DOCTYPE html>
+         <html>
+         <head>
+         <meta http-equiv="refresh" content="1">
+         </head>
+
+         <body>
+         <h2>Classroom map</h2>
+
+         <canvas id="myCanvas" width="1000" height="500" style="border:10px solid #d3d3d3;">
+         </canvas>
+
+         <script>
+         var canvas = document.getElementById("myCanvas");
+         var ctx = canvas.getContext("2d");
+         ctx.beginPath();
+         ctx.arc({},{},20,0,2*Math.PI);
+         ctx.fillStyle = 'red';
+         ctx.fill();
+         ctx.stroke();
+
+         var ctx = canvas.getContext("2d");
+         ctx.font = '8pt Calibri';
+         ctx.fillStyle = 'black';
+         ctx.textAlign = 'center';
+         ctx.fillText('phone 1',{},{})
+         </script>
+
+         </body>
+         </html>"""
+         appendedText = (text.format(x,y,x,y))                       # append text with the coordinates from trilateration
+         with open('/home/pi/newhtml/index.html','w') as file:       # with the HTML file open
+             file.write(appendedText)                                # write text to file
+     else:                                                           # else write the same text but with two dots
+         text="""
+         <!DOCTYPE html>
+         <html>
+         <head>
+         <meta http-equiv="refresh" content="1">
+         </head>
+
+         <body>
+         <h2>Classroom map</h2>
+
+         <canvas id="myCanvas" width="1000" height="500" style="border:10px solid #d3d3d3;">
+         </canvas>
+
+         <script>
+         var canvas = document.getElementById("myCanvas");
+         var ctx = canvas.getContext("2d");
+         ctx.beginPath();
+         ctx.arc(100,300,20,0,2*Math.PI);
+         ctx.fillStyle = 'red';
+         ctx.fill();
+         ctx.stroke();
+
+         var ctx = canvas.getContext("2d");
+         ctx.font = '8pt Calibri';
+         ctx.fillStyle = 'black';
+         ctx.textAlign = 'center';
+         ctx.fillText('phone 1',100,300)
+
+         ctx.beginPath();
+         ctx.arc(200,400,20,0,2*Math.PI);
+         ctx.fillStyle = 'red';
+         ctx.fill();
+         ctx.stroke();
+
+         var ctx = canvas.getContext("2d");
+         ctx.font = '8pt Calibri';
+         ctx.fillStyle = 'black';
+         ctx.textAlign = 'center';
+         ctx.fillText('phone 2',200,400)
+         </script>
+
+         </body>
+         </html>"""
+         appendedText = (text.format(300,100,300,100,400,200,400,200))
+         with open('/home/pi/newhtml/index.html','w') as file:
+             file.write(appendedText)
+
+
+with open('/home/pi/newhtml/index.html','w') as file: # at programme start clear HTML file and write no connection
+     file.write("""<!DOCTYPE html>
+                   <html>
+                   <head>
+                   <h2>no connection made</h2>
+                   <meta http-equiv="refresh" content="1">
+                   </head>
+                   </html>""")
+communication()                                      # call comunication function
